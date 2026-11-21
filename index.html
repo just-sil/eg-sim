@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EG Sim · Projection of Solids</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <header class="top">
+    <button class="icon-btn only-narrow" id="btnMenu" title="Problems">☰</button>
+    <div class="brand">EG<span>Sim</span><small>Projection of Solids</small></div>
+    <div class="ptitle" id="ptitle"></div>
+    <div class="actions">
+      <button id="btnHint" title="Reveal the next hint">💡 Hint</button>
+      <button id="btnGuide" title="Step-by-step construction">🪜 Step-by-step</button>
+      <button id="btnSolution" title="Overlay the full solution">👁 Solution</button>
+      <button id="btnCheck" class="primary" title="Check your drawing">✔ Check</button>
+      <button class="icon-btn only-narrow" id="btnPanel" title="Panel">▤</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside id="sidebar">
+      <div class="side-head">
+        <input id="search" type="search" placeholder="Search problems…">
+      </div>
+      <nav id="plist"></nav>
+      <div class="side-foot">
+        <button id="btnRandom">🎲 New random problem</button>
+        <a href="https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM4QXlMoOihTQBQloEF1sQq" target="_blank" rel="noopener">Source playlist ↗</a>
+      </div>
+    </aside>
+
+    <main class="sheet-wrap">
+      <div class="toolbar" id="toolbar"></div>
+      <div class="sheet-host">
+        <svg id="sheet" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="stepbar" id="stepbar" hidden>
+          <button id="stepPrev">◀</button>
+          <div class="stepbar-text"><b id="stepTitle"></b><span id="stepText"></span></div>
+          <button id="stepNext">▶</button>
+          <button id="stepClose" class="ghost-btn" title="Close the guide">✕</button>
+        </div>
+      </div>
+      <div class="statusbar">
+        <span id="prompt" class="prompt"></span>
+        <input id="cmd" autocomplete="off" spellcheck="false" placeholder="type: 30 · 30<45 · @10,20 · x,h">
+        <span id="snapinfo" class="snapinfo"></span>
+        <span id="coords" class="coords"></span>
+      </div>
+    </main>
+
+    <section id="panel">
+      <div class="tabs" role="tablist">
+        <button data-tab="q" class="active">Question</button>
+        <button data-tab="3d">3D view</button>
+        <button data-tab="chk">Result</button>
+      </div>
+      <div class="tab" data-tab="q" id="tabQ"></div>
+      <div class="tab" data-tab="3d" id="tab3d" hidden>
+        <div class="v3-controls">
+          <div class="seg" id="v3stages"></div>
+          <div class="seg">
+            <button data-cam="iso">3D</button><button data-cam="front">Front</button><button data-cam="top">Top</button>
+          </div>
+          <label class="chk"><input type="checkbox" id="v3proj" checked> projections</label>
+        </div>
+        <div id="v3host" class="v3host"></div>
+        <p class="muted small">Drag to orbit, scroll to zoom. The FV is drawn on the VP (green) and the TV on the HP (blue). Unfold the HP downwards about XY and you get the drawing sheet.</p>
+        <div id="v3demos"></div>
+      </div>
+      <div class="tab" data-tab="chk" id="tabChk" hidden>
+        <p class="muted">Draw your answer on the sheet and press <b>✔ Check</b>.</p>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
