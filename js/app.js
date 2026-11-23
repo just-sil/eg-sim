@@ -5,6 +5,7 @@ import { check } from './checker.js';
 import { View3D } from './view3d.js';
 import { randomProblem } from './generator.js';
 import { solidName } from './solids.js';
+import { startTour } from './tour.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -156,7 +157,7 @@ function renderList() {
     html += `<div class="pgroup">${GROUP_TITLES[g]}</div>`;
     for (const p of list) {
       const active = state.item && state.item.id === p.id ? ' active' : '';
-      html += `<button class="pitem${active}" data-id="${p.id}"><span class="pid">${esc(p.id.startsWith('R') ? '🎲' : p.id)}</span><span>${esc(p.title)}</span>${state.done[p.id] ? '<span class="tick">✓</span>' : ''}</button>`;
+      html += `<button class="pitem${active}" data-id="${p.id}"><span class="pid">${esc(p.id.startsWith('R') ? 'R' : p.id)}</span><span>${esc(p.title)}</span>${state.done[p.id] ? '<span class="tick">✓</span>' : ''}</button>`;
     }
   }
   $('#plist').innerHTML = html || '<p class="muted" style="padding:14px">No match.</p>';
@@ -199,7 +200,7 @@ function open(id) {
   updateOverlay();
   renderQuestion();
   renderList();
-  $('#tabChk').innerHTML = '<p class="muted">Draw your answer on the sheet and press <b>✔ Check</b>.</p>';
+  $('#tabChk').innerHTML = '<p class="muted">Draw your answer on the sheet and press <b>Check</b>.</p>';
   state.v3stage = state.sol ? state.sol.stages.length - 1 : 0;
   render3D();
   fit();
@@ -228,7 +229,7 @@ function renderQuestion() {
   const it = state.item;
   const tab = $('#tabQ');
   if (it.html) {
-    tab.innerHTML = `<div class="meta"><span class="chip"><a href="${yt(it.video)}" target="_blank" rel="noopener">▶ Watch the video</a></span>${it.alt ? `<span class="chip"><a href="${yt(it.alt)}" target="_blank" rel="noopener">▶ Related video</a></span>` : ''}</div><div class="card">${it.html}</div>${it.demos ? '<p><button id="qDemo3d">🧊 Explore these solids in 3D</button></p>' : ''}`;
+    tab.innerHTML = `<div class="meta"><span class="chip"><a href="${yt(it.video)}" target="_blank" rel="noopener">▶ Watch the video</a></span>${it.alt ? `<span class="chip"><a href="${yt(it.alt)}" target="_blank" rel="noopener">▶ Related video</a></span>` : ''}</div><div class="card">${it.html}</div>${it.demos ? '<p><button id="qDemo3d">Explore these solids in 3D</button></p>' : ''}`;
     $('#qDemo3d')?.addEventListener('click', () => showTab('3d'));
     return;
   }
@@ -253,10 +254,10 @@ function renderQuestion() {
     <div class="statement">${esc(it.statement)}</div>
     <div class="meta">${meta}</div>
     <h4>Hints <span class="muted small">(${state.hintsShown}/${sol.hints.length})</span></h4>
-    ${hints || '<p class="muted small">Stuck? Press 💡 Hint to reveal one hint at a time.</p>'}
-    <button id="qHint" ${state.hintsShown >= sol.hints.length ? 'disabled' : ''}>💡 Next hint</button>
+    ${hints || '<p class="muted small">Stuck? Press Hint to reveal one hint at a time.</p>'}
+    <button id="qHint" ${state.hintsShown >= sol.hints.length ? 'disabled' : ''}>Next hint</button>
     <h4>Step-by-step guide</h4>
-    <p class="muted small">Each step draws its construction on the sheet as a ghost overlay. The current step is orange. Ghost points are snappable, so you can trace over them.</p>
+    <p class="muted small">Each step draws its construction on the sheet as a ghost overlay. The current step pulses. Ghost points are snappable, so you can trace over them.</p>
     <ol class="steps">${steps}</ol>
     <details ${state.showSolution ? 'open' : ''}><summary class="muted small">Key numbers (spoiler)</summary><div class="numbers">${nums.map(esc).join('<br>')}</div></details>`;
   $('#qHint').onclick = nextHint;
@@ -339,9 +340,9 @@ function runCheck() {
     if (!x.found) return `<tr><td>${label}</td><td colspan="3" class="muted">not found on the sheet</td></tr>`;
     return `<tr><td>${label}${x.mirrored ? ' <span class="muted small">(mirrored)</span>' : ''}</td><td><b>${Math.round(x.score * 100)}%</b></td><td>${x.ok}/${x.total} ✓</td><td>${x.wrong ? `${x.wrong} style` : ''} ${x.missingN ? `${x.missingN} missing` : ''}</td></tr>`;
   }).join('')).join('');
-  const verdict = pct >= 95 && !extra ? '🎉 Excellent: every stage matches the solution.'
+  const verdict = pct >= 95 && !extra ? 'Excellent: every stage matches the solution.'
     : pct >= 95 ? 'All views are complete. Remove the extra lines shown in red.'
-      : pct >= 60 ? 'Good progress. Look at the missing (red dotted) and wrong-style (orange) lines.'
+      : pct >= 60 ? 'Good progress. Look at the missing (dotted) and wrong line-type lines.'
         : 'Keep going. Use a hint or the step-by-step guide if you are stuck.';
   $('#tabChk').innerHTML = `
     <div class="score ${pct >= 95 ? 'good' : pct >= 60 ? 'mid' : 'low'}">${pct}%</div>
@@ -430,6 +431,7 @@ cmd.addEventListener('keydown', (e) => {
   e.stopPropagation();
 });
 window.addEventListener('keydown', (e) => {
+  if (document.body.classList.contains('touring')) return;
   const tag = (e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? editor.redo() : editor.undo(); return; }
@@ -450,6 +452,22 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => { if (e.key === ' ') editor.spaceDown = false; });
 
+// ------------------------------------------------------------ theme & tour
+const THEMES = ['light', 'dark'];
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  store.set('theme', t);
+  if (v3 && v3.stage) v3.show(v3.stage, { keepCamera: true });
+}
+applyTheme(store.get('theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+$('#btnTheme').onclick = () => applyTheme(THEMES[(THEMES.indexOf(document.documentElement.dataset.theme) + 1) % 2]);
+function tour(from = 0) {
+  $('#sidebar').classList.remove('open'); $('#panel').classList.remove('open');
+  showTab('q');
+  startTour(() => store.set('toured', true), from);
+}
+$('#btnTour').onclick = () => tour();
+
 // ------------------------------------------------------------ boot
 buildToolbar();
 setTool('segment');
@@ -466,3 +484,5 @@ if (hashQ) {
   if (q.has('hints')) { state.hintsShown = +q.get('hints'); renderQuestion(); }
   if (q.has('tab')) showTab(q.get('tab'));
 }
+if (hashQ && /(^|&)tour/.test(hashQ)) tour(+(new URLSearchParams(hashQ).get('tour')) || 0);
+else if (!store.get('toured', false) && !(hashQ && hashQ.includes('notour'))) setTimeout(tour, 400);

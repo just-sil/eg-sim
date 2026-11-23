@@ -94,16 +94,17 @@ export class View3D {
     const yMax = Math.max(...ys) + 25, zMax = Math.max(...zs) + 25;
     const css = getComputedStyle(document.documentElement);
     const col = (v, d) => new THREE.Color((css.getPropertyValue(v) || d).trim() || d);
+    const ink = col('--ink', '#000'), proj = col('--proj3d', '#444');
 
     // planes
-    const hp = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, yMax), new THREE.MeshBasicMaterial({ color: col('--hp', '#6b8fd6'), transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
+    const hp = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, yMax), new THREE.MeshBasicMaterial({ color: col('--hp', '#bdbdbd'), transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
     hp.rotation.x = -Math.PI / 2; hp.position.set((x0 + x1) / 2, 0, yMax / 2);
-    const vp = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, zMax), new THREE.MeshBasicMaterial({ color: col('--vp', '#5fae8a'), transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
+    const vp = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, zMax), new THREE.MeshBasicMaterial({ color: col('--vp', '#e0e0e0'), transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
     vp.position.set((x0 + x1) / 2, zMax / 2, 0);
     g.add(hp, vp);
     g.add(this.lines([[[x0, 0, 0], [x1, 0, 0]]], col('--ink', '#222'), false));
-    g.add(this.text('HP', [x1 - 8, yMax - 6, 0.5], '#4466aa'));
-    g.add(this.text('VP', [x1 - 8, 0.5, zMax - 6], '#2f8a60'));
+    g.add(this.text('HP', [x1 - 8, yMax - 6, 0.5], ink.getStyle()));
+    g.add(this.text('VP', [x1 - 8, 0.5, zMax - 6], ink.getStyle()));
 
     // solid surface
     const tris = [];
@@ -123,7 +124,7 @@ export class View3D {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(tris.flatMap((p) => [p[0], p[2], p[1]]), 3));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: col('--solid', '#f2b54a'), transparent: true, opacity: 0.82, side: THREE.DoubleSide, flatShading: true }));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: col('--solid', '#d8d8d8'), transparent: true, opacity: 0.82, side: THREE.DoubleSide, flatShading: true }));
     g.add(mesh);
 
     // edges
@@ -138,8 +139,8 @@ export class View3D {
         if (k % 4 === 0) edges.push([P[rim[k]], top ? P[top[k]] : P[apex]]);
       }
     }
-    g.add(this.lines(edges, new THREE.Color('#3a2a10'), false));
-    g.add(this.lines([[P[s.B], P[s.T]]], new THREE.Color('#c0392b'), true));
+    g.add(this.lines(edges, col('--edge3d', '#111'), false));
+    g.add(this.lines([[P[s.B], P[s.T]]], col('--edge3d', '#111'), true));
 
     if (this.showProj) {
       // projected views drawn on the planes
@@ -148,17 +149,17 @@ export class View3D {
       const onVP = (q) => [q[0], 0.15, -q[1]];
       const onHP = (q) => [q[0], q[1], 0.15];
       const vis = (arr, map, style) => arr.filter((q) => q.style === style).map((q) => [map(q.a), map(q.b)]);
-      g.add(this.lines(vis(fv, onVP, 'visible'), new THREE.Color('#1f6b45'), false));
-      g.add(this.lines(vis(fv, onVP, 'hidden'), new THREE.Color('#1f6b45'), true));
-      g.add(this.lines(vis(tv, onHP, 'visible'), new THREE.Color('#2a4f9a'), false));
-      g.add(this.lines(vis(tv, onHP, 'hidden'), new THREE.Color('#2a4f9a'), true));
+      g.add(this.lines(vis(fv, onVP, 'visible'), proj, false));
+      g.add(this.lines(vis(fv, onVP, 'hidden'), proj, true));
+      g.add(this.lines(vis(tv, onHP, 'visible'), proj, false));
+      g.add(this.lines(vis(tv, onHP, 'hidden'), proj, true));
       // projectors from the key points
       const pr = [];
       for (const i of s.keyIdx) {
         const p = P[i];
         pr.push([p, [p[0], 0, p[2]]], [p, [p[0], p[1], 0]]);
       }
-      const m = this.lines(pr, new THREE.Color('#888'), true);
+      const m = this.lines(pr, col('--thin', '#999'), true);
       m.material.opacity = 0.45; m.material.transparent = true;
       g.add(m);
     }

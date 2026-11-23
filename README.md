@@ -20,14 +20,16 @@ No build step. three.js loads from cdnjs for the 3D view; everything else is pla
 | **Drafting sheet** | XY line, mm grid, BIS line types (thick / dashed / chain / thin). Tools: line, polyline, regular polygon, circle, compass arc, smooth curve (for ellipses), projectors, angle line, parallel and perpendicular lines, divide circle into 12, rotate-copy, move-copy, measure, label, erase, undo/redo. |
 | **Exact input** | While drawing, type `30` (length), `30<45` (length at an angle), `@dx,dh` (relative) or `x,h` (absolute). Shift snaps to 15°. Snaps to end points, intersections, midpoints and guide points. |
 | **Hints** | Progressive hints generated from the problem: resting element → stage-1 orientation → stage-2 condition → stage-3 condition, plus notes for the tricky questions. |
-| **Step-by-step** | Every construction step is drawn as a ghost overlay (current step in orange) that you can trace over. This includes projectors, the centre of gravity for suspended solids, and the arc + locus construction for the apparent angle β. |
+| **Step-by-step** | Every construction step is drawn as a ghost overlay (current step pulses) that you can trace over. This includes projectors, the centre of gravity for suspended solids, and the arc + locus construction for the apparent angle β. |
 | **Check** | Compares your drawing with the computed solution. You get a score per stage and view, and lines are marked correct, wrong line type, extra or missing. Each view may sit anywhere along XY or be mirrored. |
 | **3D view** | The solid at each stage between HP and VP, with its FV and TV drawn on the planes. Drag to orbit. |
-| **Random practice** | 🎲 builds new solvable problems from the same engine. |
+| **Random practice** | Builds new solvable problems from the same engine. |
+| **Tour** | A guided spotlight tour runs on the first visit; replay it with the **?** button. |
+| **Theme** | Black and white: black-on-white or white-on-black (**◐** button, remembered). |
 
 Keyboard: `V` select · `L` line · `O` polyline · `G` polygon · `C` circle · `A` arc · `S` curve · `J`/`H` projectors · `N` angle line · `K` parallel · `U` perpendicular · `D` divide · `R` rotate copy · `M` move copy · `Q` measure · `T` label · `E` erase · `1–4` line type · `F` fit · `Space`-drag to pan · wheel to zoom · `Ctrl+Z / Ctrl+Y`.
 
-URL shortcuts: `#P3`, `#P3?step=4`, `#P3?solution`, `#P3?tab=3d`.
+URL shortcuts: `#P3`, `#P3?step=4`, `#P3?solution`, `#P3?tab=3d`, `#P3?tour`.
 
 ## How it works
 
@@ -51,6 +53,7 @@ js/checker.js    drawing ↔ solution matching
 js/editor.js     SVG drafting editor
 js/view3d.js     three.js view
 js/generator.js  random problems
+js/tour.js       guided tour
 js/app.js        UI wiring
 ```
 

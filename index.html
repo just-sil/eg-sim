@@ -13,10 +13,12 @@
     <div class="brand">EG<span>Sim</span><small>Projection of Solids</small></div>
     <div class="ptitle" id="ptitle"></div>
     <div class="actions">
-      <button id="btnHint" title="Reveal the next hint">💡 Hint</button>
-      <button id="btnGuide" title="Step-by-step construction">🪜 Step-by-step</button>
-      <button id="btnSolution" title="Overlay the full solution">👁 Solution</button>
-      <button id="btnCheck" class="primary" title="Check your drawing">✔ Check</button>
+      <button id="btnHint" title="Reveal the next hint">Hint</button>
+      <button id="btnGuide" title="Step-by-step construction">Step-by-step</button>
+      <button id="btnSolution" title="Overlay the full solution">Solution</button>
+      <button id="btnCheck" class="primary" title="Check your drawing">Check ✓</button>
+      <button class="icon-btn" id="btnTour" title="Take the tour">?</button>
+      <button class="icon-btn" id="btnTheme" title="Switch theme (black on white / white on black)">◐</button>
       <button class="icon-btn only-narrow" id="btnPanel" title="Panel">▤</button>
     </div>
   </header>
@@ -28,7 +30,7 @@
       </div>
       <nav id="plist"></nav>
       <div class="side-foot">
-        <button id="btnRandom">🎲 New random problem</button>
+        <button id="btnRandom">New random problem</button>
         <a href="https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM4QXlMoOihTQBQloEF1sQq" target="_blank" rel="noopener">Source playlist ↗</a>
       </div>
     </aside>
@@ -68,11 +70,11 @@
           <label class="chk"><input type="checkbox" id="v3proj" checked> projections</label>
         </div>
         <div id="v3host" class="v3host"></div>
-        <p class="muted small">Drag to orbit, scroll to zoom. The FV is drawn on the VP (green) and the TV on the HP (blue). Unfold the HP downwards about XY and you get the drawing sheet.</p>
+        <p class="muted small">Drag to orbit, scroll to zoom. The FV is drawn on the VP and the TV on the HP. Unfold the HP downwards about XY and you get the drawing sheet.</p>
         <div id="v3demos"></div>
       </div>
       <div class="tab" data-tab="chk" id="tabChk" hidden>
-        <p class="muted">Draw your answer on the sheet and press <b>✔ Check</b>.</p>
+        <p class="muted">Draw your answer on the sheet and press <b>Check</b>.</p>
       </div>
     </section>
   </div>
