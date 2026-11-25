@@ -69,15 +69,29 @@ export function check(sol, prims, keys) {
   const missingAll = [];
 
   for (const st of sol.stages) {
-    const stageRes = { no: st.no, views: {} };
-    for (const v of ['FV', 'TV']) {
-      const solSegs = st[v].segs;
-      const solKeys = uniq(st[v].keyPts.concat(solSegs.filter((s) => s.kind === 'edge').flatMap((s) => [s.a, s.b])));
-      const side = (p) => (v === 'FV' ? p[1] <= 0.8 : p[1] >= -0.8);
+    if (st.noCheck) continue;
+    const stageRes = { no: st.no, views: {}, list: [] };
+    // Module 2 stages carry FV/TV; Module 3 stages carry a list of views (sectional views,
+    // true shape, development) that may sit anywhere on the sheet ("free").
+    const views = st.views || ['FV', 'TV'].map((v) => ({
+      key: v, name: v === 'FV' ? 'Front view' : 'Top view', segs: st[v].segs, keyPts: st[v].keyPts,
+      side: v === 'FV' ? 'above' : 'below', flipY: v === freeView,
+    }));
+    for (const view of views) {
+      const v = view.key;
+      const side = view.side === 'above' ? (p) => p[1] <= 0.8 : view.side === 'below' ? (p) => p[1] >= -0.8 : () => true;
       const uKeys = keys.filter(side);
       const uPrims = prims;
-      const res = fit(solSegs, solKeys, uKeys, uPrims, v === freeView);
+      // a development may be opened along any edge: try each seam, keep the best
+      let res = null;
+      for (const cand of [view, ...(view.alts || [])]) {
+        const solSegs = cand.segs;
+        const solKeys = uniq(cand.keyPts.concat(solSegs.filter((s) => s.kind === 'edge').flatMap((s) => [s.a, s.b])));
+        const r = fit(solSegs, solKeys, uKeys, uPrims, !!view.flipY);
+        if (!res || (r.summary.found && (!res.summary.found || r.summary.score > res.summary.score))) res = r;
+      }
       stageRes.views[v] = res.summary;
+      stageRes.list.push({ key: v, name: view.name, ...res.summary });
       if (res.summary.found) {
         for (const [i, s] of res.primStatus) {
           const cur = explained.get(i);
@@ -150,7 +164,7 @@ function fit(solSegs, solKeys, uKeys, uPrims, allowFlipY) {
     const present = hit >= samples.length * 0.75;
     if (s.optional) continue;
     total++; totLen += segLen(s);
-    if (present && styleHit >= samples.length * 0.75) { ok++; okLen += segLen(s); }
+    if (present && (s.anyStyle || styleHit >= samples.length * 0.75)) { ok++; okLen += segLen(s); }
     else if (present) { wrong++; okLen += segLen(s) * 0.5; }
     else missing.push(s);
   }
@@ -164,7 +178,7 @@ function fit(solSegs, solKeys, uKeys, uPrims, allowFlipY) {
     for (const q of samples) {
       let any = false, same = false;
       for (const s of segs) {
-        if (closestOnSeg(q, s.a, s.b).d <= TOL) { any = true; if (s.style === pr.style) { same = true; break; } }
+        if (closestOnSeg(q, s.a, s.b).d <= TOL) { any = true; if (s.style === pr.style || s.anyStyle) { same = true; break; } }
       }
       if (any) hit++;
       if (same) styleHit++;

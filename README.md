@@ -3,6 +3,18 @@
 A drafting playground for **KTU Engineering Graphics, Module 2: Projection of Solids**. It includes every problem from the playlist
 [KTU 2024 | Module 2 | Projection of Solids](https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM4QXlMoOihTQBQloEF1sQq) (Engineering Graphics by Nithin I K).
 
+## Module 3: Section of solids & development of surfaces
+
+From the playlist [KTU 2024 | Module 3 | Section of Solids & Development of Surfaces](https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM-hQtvy7KPfhJejOJVAG6N):
+13 section problems (horizontal, vertical, AIP, AVP and plane-parallel-to-a-generator) and 11 development problems
+(prism, cylinder, cone, pyramid, their truncated versions, two shortest-path problems and a prism with a hole). The
+"true shape is given" problems are not part of the 2024 scheme and are left out.
+
+`js/section.js` turns the solid into a convex mesh, cuts it with the plane, and projects what remains, with hatching.
+It also draws the true shape on x₁y₁ parallel to the VT/HT and unfolds the lateral faces (one affine map per face), so
+cut lines, shortest paths and holes land on the development exactly. The checker grades every view, including the true
+shape and the development, and accepts a development opened along any edge.
+
 ## Run
 
 ```bash
@@ -48,12 +60,15 @@ js/geometry.js   vector helpers
 js/solids.js     prisms, pyramids, tetrahedron, cylinder, cone
 js/stages.js     solver + overlay groups + hints/steps text
 js/projector.js  FV/TV projection, hidden lines, labels
-js/problems.js   problem bank + concept cards
+js/problems.js   problem bank + concept cards (Module 2)
+js/problems3.js  problem bank + concept cards (Module 3)
+js/section.js    Module 3 solver: sections, true shape, development
 js/checker.js    drawing ↔ solution matching
 js/editor.js     SVG drafting editor
 js/view3d.js     three.js view
 js/generator.js  random problems
 js/tour.js       guided tour
+js/revise.js     crash course (not linked from the UI)
 js/app.js        UI wiring
 ```
 

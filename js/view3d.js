@@ -126,6 +126,20 @@ export class View3D {
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: col('--solid', '#d8d8d8'), transparent: true, opacity: 0.82, side: THREE.DoubleSide, flatShading: true }));
     g.add(mesh);
+    // Module 3: the cut face (darker) and the section plane (translucent)
+    if (s.cutFace >= 0 && s.faces[s.cutFace]) {
+      const f = s.faces[s.cutFace], ct = [];
+      for (let k = 1; k < f.length - 1; k++) ct.push(P[f[0]], P[f[k]], P[f[k + 1]]);
+      const cg = new THREE.BufferGeometry();
+      cg.setAttribute('position', new THREE.Float32BufferAttribute(ct.flatMap((p) => [p[0], p[2], p[1]]), 3));
+      g.add(new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: col('--ink', '#000'), transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })));
+    }
+    if (stage.plane) {
+      const q = stage.plane, pg = new THREE.BufferGeometry();
+      pg.setAttribute('position', new THREE.Float32BufferAttribute([q[0], q[1], q[2], q[0], q[2], q[3]].flatMap((p) => [p[0], p[2], p[1]]), 3));
+      g.add(new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: col('--thin', '#999'), transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })));
+      g.add(this.lines([[q[0], q[1]], [q[1], q[2]], [q[2], q[3]], [q[3], q[0]]], col('--thin', '#999'), true));
+    }
 
     // edges
     const edges = [];

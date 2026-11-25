@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EG Sim · Projection of Solids</title>
+  <title>EG Sim · Solids</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
   <header class="top">
     <button class="icon-btn only-narrow" id="btnMenu" title="Problems">☰</button>
-    <div class="brand">EG<span>Sim</span><small>Projection of Solids</small></div>
+    <div class="brand">EG<span>Sim</span><small>Solids · Sections · Development</small></div>
     <div class="ptitle" id="ptitle"></div>
     <div class="actions">
       <button id="btnHint" title="Reveal the next hint">Hint</button>
@@ -31,7 +31,8 @@
       <nav id="plist"></nav>
       <div class="side-foot">
         <button id="btnRandom">New random problem</button>
-        <a href="https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM4QXlMoOihTQBQloEF1sQq" target="_blank" rel="noopener">Source playlist ↗</a>
+        <a href="https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM4QXlMoOihTQBQloEF1sQq" target="_blank" rel="noopener">Module 2 playlist ↗</a>
+        <a href="https://www.youtube.com/playlist?list=PLbQL6jsbZ8PM-hQtvy7KPfhJejOJVAG6N" target="_blank" rel="noopener">Module 3 playlist ↗</a>
       </div>
     </aside>
 
@@ -39,6 +40,7 @@
       <div class="toolbar" id="toolbar"></div>
       <div class="sheet-host">
         <svg id="sheet" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="coursebar" id="coursebar" hidden></div>
         <div class="stepbar" id="stepbar" hidden>
           <button id="stepPrev">◀</button>
           <div class="stepbar-text"><b id="stepTitle"></b><span id="stepText"></span></div>

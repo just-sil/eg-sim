@@ -208,6 +208,17 @@ for (const [id, src] of [['S5', 'P1'], ['S6', 'P3'], ['S7', 'P5'], ['S8', 'P9'],
   });
 }
 
+// Auxiliary plane method versions: stages 1 and 2 as usual, then an auxiliary front view
+// projected on a new reference line x1y1 instead of turning the top view (stage 3).
+for (const [id, src] of [['A1', 'P14'], ['A2', 'P6'], ['A3', 'P18'], ['A4', 'P1']]) {
+  const p = PROBLEMS.find((q) => q.id === src);
+  PROBLEMS.push({
+    ...p, id, group: 'aux', aux: true, sourceId: src,
+    title: `Auxiliary view: ${p.title}`,
+    statement: `${p.statement}\n\nSolve it by the auxiliary plane method: draw stages 1 and 2, then project the final front view on a new reference line x₁y₁ instead of redrawing the top view.`,
+  });
+}
+
 export const CONCEPTS = [
   {
     id: 'C1', video: 'mT22gALl1Uk', title: 'What is a solid? Types of solids',

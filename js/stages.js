@@ -4,6 +4,7 @@
 import { D2R, R2D, sub3, norm3, dist2 } from './geometry.js';
 import { makeSolid, withPts, baseRadii, solidHeight, solidName, baseShapeName } from './solids.js';
 import { projectSolid, toSheet, inclinations } from './projector.js';
+import { solveM3 } from './section.js';
 
 const CLEAR = 12; // clearance (mm) from the other reference plane
 const GAP = 45; // gap (mm) between stages on the sheet
@@ -32,6 +33,7 @@ const maxOf = (pts, k, n) => Math.max(...pts.slice(0, n).map((p) => p[k]));
 
 /** Solve a problem. Returns the full solution model used by the sheet, guide, checker and 3D view. */
 export function solve(problem) {
+  if (problem.cut || problem.develop || problem.path || problem.hole) return solveM3(problem); // Module 3
   const frame = problem.frame || 'HP';
   const spec = problem.solid;
   const solid0 = makeSolid(spec, ORIENT[problem.rest](problem));
@@ -126,7 +128,55 @@ export function solve(problem) {
   sol.groups = buildGroups(sol);
   sol.steps = buildSteps(sol);
   sol.hints = buildHints(sol);
+  if (problem.aux) makeAux(sol);
   return sol;
+}
+
+// ------------------------------------------------------------------
+// Auxiliary plane method (alternative to stage 3): keep the stage-2 top view and project
+// a new front view on a reference line x1y1 turned by the stage-3 angle. The auxiliary
+// view is the stage-3 front view re-drawn on x1y1, so its hidden lines are the same.
+// ------------------------------------------------------------------
+function makeAux(sol) {
+  const [s1, s2, s3] = sol.stages;
+  if (!s3 || sol.frame !== 'HP') return;
+  const p = sol.problem, s3p = p.stage3;
+  const a = sol.numbers.alpha * D2R;
+  const u = [Math.cos(a), -Math.sin(a)]; // x1y1 direction in the sheet (TV coordinates)
+  const n = [-Math.sin(a), -Math.cos(a)]; // away from the top view
+  const dot = (q, r) => q[0] * r[0] + q[1] * r[1];
+  const tv2 = (i) => toSheet(s2.solid.pts[i], 'TV');
+  const fv3 = (i) => toSheet(s3.solid.pts[i], 'FV');
+  const k0 = s2.solid.keyIdx[0];
+  const c = fv3(k0)[0] - dot(tv2(k0), u);
+  // put x1y1 beyond everything already drawn, so the new view has room
+  let d0 = -Infinity;
+  for (const st of [s1, s2]) for (const v of ['FV', 'TV']) for (const sg of st[v].segs) for (const q of [sg.a, sg.b]) d0 = Math.max(d0, dot(q, n));
+  d0 += 20;
+  const map = (q) => { const t = q[0] - c, z = -q[1]; return [u[0] * t + n[0] * (d0 + z), u[1] * t + n[1] * (d0 + z)]; };
+  const segs = s3.FV.segs.map((sg) => ({ ...sg, a: map(sg.a), b: map(sg.b) }));
+  const labels = s3.FV.labels.map((l) => ({ ...l, p: map(l.p), at: map(l.at), text: l.text.replace('₃', '₁') }));
+  const keyPts = s3.FV.keyPts.map(map);
+  const ts = s3.FV.keyPts.map((q) => q[0] - c);
+  const lineAt = (t) => [u[0] * t + n[0] * d0, u[1] * t + n[1] * d0];
+  const x1 = lineAt(Math.min(...ts) - 15), y1 = lineAt(Math.max(...ts) + 15);
+  const G = sol.groups;
+  for (const k of Object.keys(G)) if (k.startsWith('s3.')) delete G[k];
+  G['aux.line'] = { segs: [{ a: x1, b: y1, style: 'construction' }], labels: [{ p: x1, at: [x1[0] - n[0] * 3, x1[1] - n[1] * 3], text: 'x₁' }, { p: y1, at: [y1[0] - n[0] * 3, y1[1] - n[1] * 3], text: 'y₁' }] };
+  G['aux.proj'] = { segs: s2.solid.keyIdx.map((i) => ({ a: tv2(i), b: map(fv3(i)), style: 'construction' })) };
+  G['aux.view'] = { segs: segs.filter((sg) => sg.kind !== 'axis'), labels };
+  G['aux.axis'] = { segs: segs.filter((sg) => sg.kind === 'axis') };
+  const ang = s3p.type === 'edgeQ' ? s3p.angle : s3p.angle;
+  const ref = s3p.type === 'edgeQ' ? 'the top view of the resting edge' : 'the top view of the axis';
+  sol.steps = sol.steps.filter((st) => st.stage < 3);
+  sol.steps.push(
+    { stage: 3, title: 'Auxiliary reference line x₁y₁', text: `Don't redraw the top view. Keep the stage-2 top view where it is and turn the reference line instead: draw a new line x₁y₁ making ${ang}° with ${ref}, on the far side of the drawing. Mark it x₁y₁.`, show: ['aux.line'] },
+    { stage: 3, title: 'Projectors ⟂ x₁y₁', text: 'From every point of the stage-2 top view draw a thin projector perpendicular to x₁y₁, across it.', show: ['aux.line', 'aux.proj'] },
+    { stage: 3, title: 'Auxiliary front view', text: 'On each projector, measure from x₁y₁ the height of the same point above XY in the stage-2 front view. Join the points: visible edges thick, hidden dashed, axis chain. This is the required front view, drawn on x₁y₁ (the same shape the change-of-position method would give).', show: ['aux.line', 'aux.proj', 'aux.view', 'aux.axis'] },
+  );
+  sol.hints = sol.hints.filter((h) => !h.startsWith('Stage 3'));
+  sol.hints.push(`Last step by the auxiliary plane method: x₁y₁ at ${ang}° to ${ref}. Projectors ⟂ x₁y₁; heights from the stage-2 front view.`);
+  sol.stages[2] = { ...s3, title: 'Auxiliary view', views: [{ key: 'AUX', name: 'Auxiliary front view (on x₁y₁)', segs, keyPts, side: 'free', flipY: true }] };
 }
 
 // ------------------------------------------------------------------

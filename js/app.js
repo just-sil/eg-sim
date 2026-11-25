@@ -1,11 +1,13 @@
 import { Editor, TOOLS, STYLES } from './editor.js';
 import { PROBLEMS, CONCEPTS, yt } from './problems.js';
+import { PROBLEMS3, CONCEPTS3, yt3 } from './problems3.js';
 import { solve } from './stages.js';
 import { check } from './checker.js';
 import { View3D } from './view3d.js';
 import { randomProblem } from './generator.js';
 import { solidName } from './solids.js';
 import { startTour } from './tour.js';
+import { mountRevision } from './revise.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -31,11 +33,13 @@ const state = {
   v3stage: 0,
   done: store.get('done', {}),
   randoms: store.get('randoms', []),
+  mock: null, // { id, end, min, start, timer }
+  drawKey: null, // where the sheet is saved ('draw.<id>', or 'draw.mock' for a mock attempt)
 };
 
 // ------------------------------------------------------------ editor
 const editor = new Editor($('#sheet'), {
-  onChange: () => { if (state.item && !state.item.html) store.set('draw.' + state.item.id, editor.elements); updateUndo(); },
+  onChange: () => { if (state.item && !state.item.html) store.set(state.drawKey, editor.elements); updateUndo(); },
   onStatus: (s) => {
     if (s.prompt !== undefined) $('#prompt').textContent = s.prompt;
     if (s.coords !== undefined) $('#coords').textContent = s.coords;
@@ -133,18 +137,27 @@ function updateUndo() {
 }
 
 // ------------------------------------------------------------ sidebar
+const M3_GROUPS = new Set(['concept3', 'section', 'develop']);
+const isM3 = (it) => !!it && M3_GROUPS.has(it.group);
+const video = (it, id) => (isM3(it) ? yt3(id) : yt(id));
 const GROUP_TITLES = {
   concept: 'Concepts (videos 1, 4, 5, 9)',
   simple: 'Simple positions (videos 2–3)',
   first: 'Drill: choose the first stage',
   inclined: 'Axis inclined: change of position',
   random: 'Random practice',
+  concept3: 'Concepts',
+  section: 'Section of solids',
+  develop: 'Development of surfaces',
 };
+const MODULE_BEFORE = { concept: 'Module 2 · Projection of solids', concept3: 'Module 3 · Sections & development' };
 function allItems() {
   return [
     ...CONCEPTS.map((c) => ({ ...c, group: 'concept' })),
     ...PROBLEMS,
     ...state.randoms,
+    ...CONCEPTS3,
+    ...PROBLEMS3,
   ];
 }
 function renderList() {
@@ -154,6 +167,7 @@ function renderList() {
   for (const g of Object.keys(GROUP_TITLES)) {
     const list = items.filter((p) => p.group === g);
     if (!list.length) continue;
+    if (MODULE_BEFORE[g]) html += `<div class="pmodule">${MODULE_BEFORE[g]}</div>`;
     html += `<div class="pgroup">${GROUP_TITLES[g]}</div>`;
     for (const p of list) {
       const active = state.item && state.item.id === p.id ? ' active' : '';
@@ -181,10 +195,12 @@ $('#btnRandom').onclick = () => {
 function open(id) {
   const item = allItems().find((p) => p.id === id);
   if (!item) return;
+  if (state.mock) endMock(false);
   state.item = item;
   state.hintsShown = 0;
   state.step = -1;
   state.showSolution = false;
+  state.drawKey = 'draw.' + id;
   store.set('last', id);
   history.replaceState(null, '', '#' + id);
   $('#ptitle').textContent = `${item.id} · ${item.title}`;
@@ -206,13 +222,15 @@ function open(id) {
   fit();
   requestAnimationFrame(() => requestAnimationFrame(fit));
   updateUndo();
+  updateCourseBar();
   if (item.html) showTab('q');
 }
 
 function solutionBounds() {
   if (!state.sol) return [-10, -90, 200, 70];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const st of state.sol.stages) for (const v of ['FV', 'TV']) for (const s of st[v].segs) for (const p of [s.a, s.b]) {
+  const segsOf = (st) => (st.views ? st.views.flatMap((v) => v.segs) : [...st.FV.segs, ...st.TV.segs]);
+  for (const st of state.sol.stages) for (const s of segsOf(st)) for (const p of [s.a, s.b]) {
     x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
   }
   return [Math.min(0, x0), Math.min(-10, y0), x1, Math.max(10, y1)];
@@ -229,27 +247,45 @@ function renderQuestion() {
   const it = state.item;
   const tab = $('#tabQ');
   if (it.html) {
-    tab.innerHTML = `<div class="meta"><span class="chip"><a href="${yt(it.video)}" target="_blank" rel="noopener">▶ Watch the video</a></span>${it.alt ? `<span class="chip"><a href="${yt(it.alt)}" target="_blank" rel="noopener">▶ Related video</a></span>` : ''}</div><div class="card">${it.html}</div>${it.demos ? '<p><button id="qDemo3d">Explore these solids in 3D</button></p>' : ''}`;
+    tab.innerHTML = `<div class="meta"><span class="chip"><a href="${video(it, it.video)}" target="_blank" rel="noopener">▶ Watch the video</a></span>${it.alt ? `<span class="chip"><a href="${video(it, it.alt)}" target="_blank" rel="noopener">▶ Related video</a></span>` : ''}</div><div class="card">${it.html}</div>${it.demos ? '<p><button id="qDemo3d">Explore these solids in 3D</button></p>' : ''}`;
     $('#qDemo3d')?.addEventListener('click', () => showTab('3d'));
     return;
   }
   const sol = state.sol, n = sol.numbers;
+  const m3 = sol.module === 3;
   const meta = [
     `<span class="chip">${esc(solidName(it.solid))}</span>`,
-    `<span class="chip">rests on ${sol.frame}</span>`,
-    `<span class="chip">${sol.stages.length} stage${sol.stages.length > 1 ? 's' : ''}</span>`,
-    it.video ? `<span class="chip"><a href="${yt(it.video)}" target="_blank" rel="noopener">▶ Watch the solution</a></span>` : '',
-    it.alt ? `<span class="chip"><a href="${yt(it.alt)}" target="_blank" rel="noopener">▶ Alt video</a></span>` : '',
+    m3 ? `<span class="chip">${it.cut ? { H: 'horizontal plane', V: 'vertical plane', AIP: 'AIP', AVP: 'AVP', gen: 'plane ∥ generator' }[it.cut.type] : it.path ? 'shortest path' : 'development'}</span>` : `<span class="chip">rests on ${sol.frame}</span>`,
+    m3 ? `<span class="chip">${sol.views.length} views</span>` : `<span class="chip">${sol.stages.length} stage${sol.stages.length > 1 ? 's' : ''}</span>`,
+    it.video ? `<span class="chip"><a href="${video(it, it.video)}" target="_blank" rel="noopener">▶ Watch the solution</a></span>` : '',
+    it.alt ? `<span class="chip"><a href="${video(it, it.alt)}" target="_blank" rel="noopener">▶ Alt video</a></span>` : '',
   ].join('');
+  if (state.mock) {
+    tab.innerHTML = `
+    <div class="statement">${esc(it.statement)}</div>
+    <div class="meta">${meta.replace(/<span class="chip"><a[\s\S]*?<\/span>/g, '')}</div>
+    <div class="card"><b>Mock exam in progress.</b><p class="small muted">Hints, the guide, the solution and the 3D view are locked. Press <b>Submit</b> in the header when you finish.</p></div>`;
+    return;
+  }
   const hints = sol.hints.slice(0, state.hintsShown).map((h, i) => `<div class="hint"><b>Hint ${i + 1}.</b> ${esc(h)}</div>`).join('');
   const steps = sol.steps.map((s, i) => {
     const cls = i < state.step ? 'done' : i === state.step ? 'now' : '';
-    return `<li class="${cls}" data-step="${i}"><div class="st">Stage ${s.stage}</div><b>${esc(s.title)}</b>${i === state.step ? `<div>${esc(s.text)}</div>` : ''}</li>`;
+    return `<li class="${cls}" data-step="${i}"><div class="st">${m3 ? 'Step ' + (i + 1) : 'Stage ' + s.stage}</div><b>${esc(s.title)}</b>${i === state.step ? `<div>${esc(s.text)}</div>` : ''}</li>`;
   }).join('');
   const nums = [];
-  if (n.theta !== undefined) nums.push(`axis to ${sol.frame} θ = ${n.theta.toFixed(1)}°`);
-  if (n.beta !== undefined) nums.push(`apparent angle β = ${n.beta.toFixed(1)}°`);
-  nums.push(`final axis: ${n.final.hp.toFixed(1)}° to HP, ${n.final.vp.toFixed(1)}° to VP`);
+  if (m3) {
+    nums.push(`draw: ${sol.views.map((v) => v.name.toLowerCase()).join(', ')}`);
+    if (n.sectionShape) nums.push(`true shape of the section: ${n.sectionShape}`);
+    if (n.sectionArea) nums.push(`section area ≈ ${n.sectionArea.toFixed(0)} mm²`);
+    if (n.perimeter) nums.push(`development length (perimeter) = ${n.perimeter.toFixed(1)} mm`);
+    if (n.slant) nums.push(`true length of slant edge / generator = ${n.slant.toFixed(1)} mm`);
+    if (n.sector) nums.push(`sector angle = ${n.sector.toFixed(1)}°`);
+    if (n.pathLength) nums.push(`shortest path = ${n.pathLength.toFixed(1)} mm`);
+  } else {
+    if (n.theta !== undefined) nums.push(`axis to ${sol.frame} θ = ${n.theta.toFixed(1)}°`);
+    if (n.beta !== undefined) nums.push(`apparent angle β = ${n.beta.toFixed(1)}°`);
+    nums.push(`final axis: ${n.final.hp.toFixed(1)}° to HP, ${n.final.vp.toFixed(1)}° to VP`);
+  }
   tab.innerHTML = `
     <div class="statement">${esc(it.statement)}</div>
     <div class="meta">${meta}</div>
@@ -275,6 +311,7 @@ function goStep(i) {
   if (!state.sol) return;
   const n = state.sol.steps.length;
   state.step = Math.max(-1, Math.min(n - 1, i));
+  if (state.step === n - 1 && !state.mock) { const w = store.get('watched', {}); w[state.item.id] = true; store.set('watched', w); updateCourseBar(); }
   updateOverlay();
   renderQuestion();
   const li = $(`.steps li[data-step="${state.step}"]`);
@@ -329,14 +366,13 @@ function runCheck() {
   let sum = 0, wsum = 0;
   r.stages.forEach((st, i) => {
     const w = i === r.stages.length - 1 ? 2 : 1;
-    sum += w * (st.views.FV.score + st.views.TV.score) / 2; wsum += w;
+    sum += w * st.list.reduce((s, v) => s + v.score, 0) / st.list.length; wsum += w;
   });
   const pct = Math.round((sum / wsum) * 100);
   const extra = Object.values(r.status).filter((s) => s === 'extra').length;
   const wrongEls = Object.values(r.status).filter((s) => s === 'wrong').length;
-  const rows = r.stages.map((st) => ['FV', 'TV'].map((v) => {
-    const x = st.views[v];
-    const label = `Stage ${st.no} · ${v === 'FV' ? 'Front view' : 'Top view'}`;
+  const rows = r.stages.map((st) => st.list.map((x) => {
+    const label = state.sol.module === 3 ? x.name : `Stage ${st.no} · ${x.name}`;
     if (!x.found) return `<tr><td>${label}</td><td colspan="3" class="muted">not found on the sheet</td></tr>`;
     return `<tr><td>${label}${x.mirrored ? ' <span class="muted small">(mirrored)</span>' : ''}</td><td><b>${Math.round(x.score * 100)}%</b></td><td>${x.ok}/${x.total} ✓</td><td>${x.wrong ? `${x.wrong} style` : ''} ${x.missingN ? `${x.missingN} missing` : ''}</td></tr>`;
   }).join('')).join('');
@@ -354,17 +390,21 @@ function runCheck() {
       <span><i style="background:var(--bad)"></i>extra</span>
       <span><i style="background:repeating-linear-gradient(90deg,var(--bad) 0 3px,transparent 3px 6px)"></i>missing</span>
     </div>
-    <p class="small muted">${extra} extra · ${wrongEls} wrong line type. Each view can sit anywhere along XY and may be mirrored. Thin construction lines are never counted. Generators and axes are optional.</p>
+    <p class="small muted">${extra} extra · ${wrongEls} wrong line type. ${state.sol.module === 3 ? 'Each view (and the true shape / development) can sit anywhere and may be mirrored. A development may start at any edge. Thin lines are never counted; hatching, the VT/HT, fold lines, generators and the removed part are optional.' : 'Each view can sit anywhere along XY and may be mirrored. Thin construction lines are never counted. Generators and axes are optional.'}</p>
     <label class="chk"><input type="checkbox" id="showMissing" checked> show missing lines</label>
     <p><button id="clearMarks">Clear marks</button></p>`;
   $('#showMissing').onchange = (e) => editor.setHighlight({ status: r.status, missing: e.target.checked ? r.missing : [] });
   $('#clearMarks').onclick = () => editor.setHighlight(null);
   showTab('chk');
+  const best = store.get('best', {});
+  if (pct > (best[state.item.id] || 0)) { best[state.item.id] = pct; store.set('best', best); }
   if (pct >= 95 && !extra) {
     state.done[state.item.id] = true;
     store.set('done', state.done);
     renderList();
   }
+  updateCourseBar();
+  return pct;
 }
 
 // ------------------------------------------------------------ 3D tab
@@ -388,7 +428,7 @@ function render3D(demoKey) {
   if (!sol) return;
   state.v3sol = sol;
   const k = Math.min(state.v3stage, sol.stages.length - 1);
-  $('#v3stages').innerHTML = sol.stages.map((s, i) => `<button class="${i === k ? 'active' : ''}" data-stage="${i}">Stage ${s.no}</button>`).join('');
+  $('#v3stages').innerHTML = sol.stages.map((s, i) => `<button class="${i === k ? 'active' : ''}" data-stage="${i}">${esc(s.title || 'Stage ' + s.no)}</button>`).join('');
   $('#v3demos').innerHTML = it && it.demos ? it.demos.map((d) => `<button data-demo="${d}">${DEMOS[d].title}</button>`).join('') : '';
   v3.show(sol.stages[k]);
 }
@@ -431,7 +471,7 @@ cmd.addEventListener('keydown', (e) => {
   e.stopPropagation();
 });
 window.addEventListener('keydown', (e) => {
-  if (document.body.classList.contains('touring')) return;
+  if (document.body.classList.contains('touring') || document.body.classList.contains('revising')) return;
   const tag = (e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? editor.redo() : editor.undo(); return; }
@@ -468,21 +508,118 @@ function tour(from = 0) {
 }
 $('#btnTour').onclick = () => tour();
 
+// ------------------------------------------------------------ last-day revision (hidden, #revise)
+const revision = mountRevision({
+  store,
+  done: () => state.done,
+  openProblem: (id, query) => { location.hash = '#' + id + (query ? '?' + query : ''); },
+  close: () => { location.hash = '#' + (state.item ? state.item.id : store.get('last', 'C1')); },
+});
+
+// Crash-course bar on the sheet: what to do for the current lesson task, and a way on.
+function updateCourseBar() {
+  const bar = $('#coursebar');
+  const c = state.item ? revision.courseBar(state.item.id) : null; // only called after boot, when revision exists
+  bar.hidden = !c;
+  if (!c) return;
+  bar.innerHTML = `
+    <div class="cb-text"><b>${c.mod} · Lesson ${c.lesson}/${c.of} · ${esc(c.verb)}: ${esc(c.text)}</b><span>${c.done ? '✓ Done. Move on when ready.' : esc(c.how)}</span></div>
+    <button id="cbCourse" title="Back to the lesson list">Lessons</button>
+    <button id="cbNext" class="${c.done ? 'primary' : ''}">${c.hasNext ? 'Next task →' : 'Finish →'}</button>`;
+  $('#cbCourse').onclick = () => { location.hash = c.home; };
+  $('#cbNext').onclick = () => revision.courseNext();
+}
+
+// ------------------------------------------------------------ mock exam (#P3?mock=20)
+const chip = document.createElement('span');
+chip.className = 'mock-chip';
+chip.hidden = true;
+chip.innerHTML = '<span id="mockTime"></span><button id="mockSubmit" class="primary">Submit</button><button id="mockQuit" class="icon-btn" title="Abandon the mock">✕</button>';
+$('.actions').prepend(chip);
+const LOCKED = ['#btnHint', '#btnGuide', '#btnSolution', '#btnCheck']; // Check would reveal missing lines
+const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+function startMock(min) {
+  state.mock = { id: state.item.id, min, start: Date.now(), end: Date.now() + min * 60e3 };
+  state.drawKey = 'draw.mock'; // keep the mock attempt apart from the normal practice drawing
+  editor.load([]);
+  store.set('draw.mock', []);
+  editor.setHighlight(null);
+  LOCKED.forEach((s) => { $(s).disabled = true; });
+  $('.tabs button[data-tab="3d"]').disabled = true;
+  $('#tabChk').innerHTML = '<p class="muted">Draw your answer, then press <b>Submit</b>.</p>';
+  showTab('q');
+  renderQuestion();
+  chip.hidden = false;
+  document.body.classList.add('mocking');
+  tick();
+  state.mock.timer = setInterval(tick, 1000);
+  fit();
+}
+function tick() {
+  if (!state.mock) return;
+  const left = Math.max(0, Math.round((state.mock.end - Date.now()) / 1000));
+  $('#mockTime').textContent = '⏱ ' + mmss(left);
+  chip.classList.toggle('low', left <= 120);
+  if (!left) endMock(true, true);
+}
+function endMock(submit, timeout = false) {
+  const m = state.mock;
+  if (!m) return;
+  clearInterval(m.timer);
+  state.mock = null;
+  chip.hidden = true;
+  document.body.classList.remove('mocking');
+  LOCKED.forEach((s) => { $(s).disabled = !state.sol; });
+  $('.tabs button[data-tab="3d"]').disabled = false;
+  if (!submit) return;
+  const used = Math.min(m.min * 60, Math.round((Date.now() - m.start) / 1000));
+  const pct = runCheck();
+  const hist = store.get('rev.mocks', []);
+  store.set('rev.mocks', [{ id: m.id, pct, used, timeout, at: Date.now() }, ...hist].slice(0, 30));
+  revision.markWeak(m.id, pct < 80);
+  updateCourseBar();
+  renderQuestion();
+  $('#tabChk').insertAdjacentHTML('afterbegin', `<div class="card"><b>Mock ${timeout ? 'timed out' : 'submitted'}</b> · ${pct}% in ${mmss(used)}${pct < 80 ? ' · added to your weak list' : ''}<p class="small"><a href="${revision.courseBar(m.id)?.home || '#revise'}">Back to the lessons →</a> · Hints and the solution are unlocked again.</p></div>`);
+}
+$('#mockSubmit').onclick = () => endMock(true);
+$('#mockQuit').onclick = () => { if (confirm('Abandon this mock? It will not be recorded.')) endMock(false); renderQuestion(); };
+
 // ------------------------------------------------------------ boot
 buildToolbar();
 setTool('segment');
 setStyle('visible');
 renderList();
-// URL: #P1  or  #P1?solution  #P1?step=4  #P1?tab=3d  (handy for sharing a view)
-const [hashId, hashQ] = decodeURIComponent(location.hash.slice(1)).split('?');
-const start = hashId || store.get('last', 'C1');
-open(allItems().some((p) => p.id === start) ? start : 'C1');
-if (hashQ) {
-  const q = new URLSearchParams(hashQ);
-  if (q.has('solution')) { state.showSolution = true; updateOverlay(); renderQuestion(); }
-  if (q.has('step')) goStep(+q.get('step'));
-  if (q.has('hints')) { state.hintsShown = +q.get('hints'); renderQuestion(); }
-  if (q.has('tab')) showTab(q.get('tab'));
+// URL: #P1  or  #P1?solution  #P1?step=4  #P1?tab=3d  #P1?mock=20  (handy for sharing a view)
+// Hidden: #revise, #revise/quiz, #revise/pyq, #revise/mock opens the last-day revision mode.
+function route() {
+  const [hashId, hashQ] = decodeURIComponent(location.hash.slice(1)).split('?');
+  const rv = /^revise(?:\/(\w+))?$/.exec(hashId || '') || (hashId === 'exam' ? [hashId, 'exam'] : null);
+  if (rv) {
+    const h = location.hash;
+    if (!state.item) open(store.get('last', 'C1')); // open() rewrites the hash, so restore it
+    history.replaceState(null, '', h);
+    revision.show(rv[1]);
+    return { revise: true };
+  }
+  revision.hide();
+  const start = hashId || store.get('last', 'C1');
+  open(allItems().some((p) => p.id === start) ? start : 'C1');
+  if (hashQ) {
+    const q = new URLSearchParams(hashQ);
+    if (q.has('mock') && state.sol) { startMock(+q.get('mock') || 20); return { mock: true }; }
+    if (q.has('solution')) { state.showSolution = true; updateOverlay(); renderQuestion(); }
+    if (q.has('step')) goStep(+q.get('step'));
+    if (q.has('hints')) { state.hintsShown = +q.get('hints'); renderQuestion(); }
+    if (q.has('tab')) showTab(q.get('tab'));
+  }
+  return { hashQ };
 }
-if (hashQ && /(^|&)tour/.test(hashQ)) tour(+(new URLSearchParams(hashQ).get('tour')) || 0);
-else if (!store.get('toured', false) && !(hashQ && hashQ.includes('notour'))) setTimeout(tour, 400);
+addEventListener('hashchange', () => {
+  // open() rewrites the hash with replaceState, which does not fire hashchange
+  if (state.item && location.hash === '#' + state.item.id && !revision.isOpen()) return;
+  route();
+});
+const booted = route();
+const bootQ = booted.hashQ || '';
+if (/(^|&)tour/.test(bootQ)) tour(+(new URLSearchParams(bootQ).get('tour')) || 0);
+else if (!booted.revise && !booted.mock && !store.get('toured', false) && !bootQ.includes('notour')) setTimeout(tour, 400);
